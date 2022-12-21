@@ -9,7 +9,7 @@ BluetoothSerial ESP_BT;
 #define pinINB1 13 // Moteur B, entrée 1 - Commande en PWM possible
 #define pinINB2 12 // Moteur B, entrée 2 - Commande en PWM possible
 
-#define pinLEDRouge 25
+#define pinLEDRouge 25    //c'est toujours moi
 #define pinLEDBlanche 26  //coucou c'est valentin
 
 #define LDR 27 // Photoresistance 
