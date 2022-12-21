@@ -12,7 +12,7 @@ BluetoothSerial ESP_BT;
 #define pinLEDRouge 25
 #define pinLEDBlanche 26
 
-#define LDR 27 // Photoresistance 
+#define LDR 27 // Photoresistance de mathnousse la blonde
 
 float pourcentageVitesse=0;
 
