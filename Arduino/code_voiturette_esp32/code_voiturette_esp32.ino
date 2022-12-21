@@ -9,9 +9,8 @@ BluetoothSerial ESP_BT;
 #define pinINB1 13 // Moteur B, entrée 1 - Commande en PWM possible
 #define pinINB2 12 // Moteur B, entrée 2 - Commande en PWM possible
 
-#define pinLEDRouge 25    //c'est toujours moi
-#define pinLEDBlanche 26  //coucou fini les conneries 
-// Et non en fait, c'est repartiiiii
+#define pinLEDRouge 25
+#define pinLEDBlanche 26
 
 #define LDR 27 // Photoresistance 
 
@@ -40,104 +39,92 @@ void setup() {
 void loop() {
   // put your main code here, to run repeatedly:
   
+  
   if(ESP_BT.hasClient()){
     Serial.println("Bluetooth connected");
     while(ESP_BT.hasClient()) 
     { 
+      checkStateLights();
       int received;
-      received = ESP_BT.read();
-        
-      if((char)received=='a'){
-            // --- Avancer les deux moteurs-------------------
-            // Marche avant
-            Serial.println("Avancer : " + (String)pourcentageVitesse);
-            avancer(pourcentageVitesse);
-     }
+      received = ESP_BT.read();        
 
-        else if((char)received=='r'){
-            // --- Reculer  les deux moteurs-------------------
-            //Marche arrière
-            Serial.println("Reculer : " + (String)pourcentageVitesse);
-            reculer(pourcentageVitesse);
-            
-            
-        }
+      if((char)received=='d'){   //d comme droite
+          Serial.println("roue droite");
+          String chaine="";
+          while((char)received!='w'){
+            Serial.println((char)received);
+            chaine += (char)received;
+            received=ESP_BT.read();
+          }
+          chaine = chaine.substring(1,-1);
+          char floatbuf[32]; //make this at least big enough for the whole string
+          chaine.toCharArray(floatbuf, sizeof(floatbuf));
+          float f = atof(floatbuf);
+          pourcentageVitesse= f*100;
+          roue_droite(pourcentageVitesse);
+      }
+      
+      else if((char)received=='g'){ //comme gauche
+          Serial.println("roue gauche");
+          String chaine="";
+          while((char)received!='w'){
+            Serial.println((char)received);
+            chaine += (char)received;
+            received=ESP_BT.read();
+          }
+          chaine = chaine.substring(1,-1);
+          char floatbuf[32]; //make this at least big enough for the whole string
+          chaine.toCharArray(floatbuf, sizeof(floatbuf));
+          float f = atof(floatbuf);
+          pourcentageVitesse= f*100;
+          roue_gauche(pourcentageVitesse);
+      }
 
-        else if((char)received=='d'){
-            // --- Tourner à droite-------------------
-            int duty = int(pourcentageVitesse*2.55);
-            Serial.println("Tourner à droite");
-            analogWrite( pinINA2, LOW);
-            analogWrite( pinINB1, LOW);
-            analogWrite( pinINA1, duty );
-            analogWrite(pinINB2, duty);
-            delay(100);
-            avancer(pourcentageVitesse);
-        }
-        else if((char)received=='g'){
-            // --- Tourner à gauche-------------------
-            int duty = int(pourcentageVitesse*2.55);
-            Serial.println("Tourner à gauche");
-            analogWrite( pinINA1, LOW);
-            analogWrite( pinINB2, LOW);
-            analogWrite( pinINA2, duty );
-            analogWrite(pinINB1, duty);
-            delay(100);
-            avancer(pourcentageVitesse);
-        }
-        else if((char)received=='s'){
-            // --- STOP -------------------
-            stopCar();
+      
+      else if((char)received=='s'){
+          stopCar();
 
-        }
-        else if((char)received=='v'){
-            // --- STOP -------------------
-            Serial.println("Changement de vitesse");
-            String chaine="";
-            while((char)received!='w'){
-              Serial.println((char)received);
-              chaine += (char)received;
-              received=ESP_BT.read();
-            }
-            chaine = chaine.substring(1,-1);
-            char floatbuf[32]; //make this at least big enough for the whole string
-            chaine.toCharArray(floatbuf, sizeof(floatbuf));
-            float f = atof(floatbuf);
-            pourcentageVitesse= f*100;
-            if(isAvance){
-              avancer(pourcentageVitesse); 
-            }
-            else if(isRecule){
-              reculer(pourcentageVitesse);
-            }
-        }     
+      }    
     }
   }
   else{
     Serial.println("Bluetooth NOT connected");
+    stopCar();
   }
   checkStateLights();
   
 }
 
-void avancer(float pourcentageVitesse){
-  analogWrite( pinINA2, LOW );
-  analogWrite(pinINB2, LOW);
-  int duty = int(pourcentageVitesse*2.55);
-  analogWrite( pinINA1, duty );
-  analogWrite(pinINB1, duty);
-  isAvance=true;
-  isRecule=false;
+//                    //
+//FONCTIONS AUXILIAIRES//
+//                    //
+
+void roue_gauche(float pourcentageVitesse){
+  if(pourcentageVitesse > 0){
+    analogWrite( pinINA2, LOW );
+    int duty = int(pourcentageVitesse*2.55);
+    analogWrite( pinINA1, duty );
+  }
+  else{
+    pourcentageVitesse *= -1;
+    analogWrite( pinINA1, LOW );
+    int duty = int(pourcentageVitesse*2.55);
+    analogWrite( pinINA2, duty );
+  }
 }
 
-void reculer(float pourcentagevitesse){
-  analogWrite( pinINA1, LOW );
-  analogWrite(pinINB1, LOW);
-  int duty = int(pourcentageVitesse*2.55);
-  analogWrite( pinINA2, duty );
-  analogWrite(pinINB2, duty);
-  isAvance=false;
-  isRecule=true;
+void roue_droite(float pourcentageVitesse){
+  if(pourcentageVitesse > 0){
+    analogWrite( pinINB2, LOW );
+    int duty = int(pourcentageVitesse*2.55);
+    analogWrite( pinINB1, duty );
+  }
+  else{
+    pourcentageVitesse *= -1;
+    analogWrite( pinINB1, LOW );
+    int duty = int(pourcentageVitesse*2.55);
+    analogWrite( pinINB2, duty );
+  }
 }
 
 void checkStateLights(){
