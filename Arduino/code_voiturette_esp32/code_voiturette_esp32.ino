@@ -15,7 +15,12 @@ BluetoothSerial ESP_BT;
 #define LDR 27 // Photoresistance 
 
 float pourcentageVitesse=0;
-
+int eclairage_minimal = 1000;
+long int t1 = 0;
+long int t2 = 0;
+boolean feux_allume = false;
+boolean isAllume = false;
+boolean feux_auto = true;
 boolean isAvance = false;
 boolean isRecule = false;
 
@@ -80,7 +85,16 @@ void loop() {
           roue_gauche(pourcentageVitesse);
       }
 
-      
+      else if((char)received=='m'){ //comme manuel, pour l'eclairage
+        feux_auto = false;              
+      }
+      else if((char)received=='a'){ //comme automatique, pour l'eclairage
+        feux_auto = true;              
+      }
+      else if((char)received=='f'){ //comme feux, pour allumer l'eclairage
+        feux_allume = 1-feux_allume; 
+        isAllume = feux_allume;             
+      }
       else if((char)received=='s'){
           stopCar();
 
@@ -90,6 +104,12 @@ void loop() {
   else{
     Serial.println("Bluetooth NOT connected");
     stopCar();
+    digitalWrite(pinLEDRouge, HIGH);
+    digitalWrite(pinLEDBlanche, HIGH);
+    delay(200);
+    digitalWrite(pinLEDRouge, LOW);
+    digitalWrite(pinLEDBlanche, LOW);
+    delay(200);
   }
   checkStateLights();
   
@@ -128,14 +148,40 @@ void roue_droite(float pourcentageVitesse){
 }
 
 void checkStateLights(){
-  int value = analogRead(LDR);
-  if(value>2000){
-    digitalWrite(pinLEDRouge, HIGH);
-    digitalWrite(pinLEDBlanche, HIGH);
+  if(feux_auto){  //si les feux sont en mode automatiques
+    int value = analogRead(LDR);
+    if(value>eclairage_minimal){//suffisament clair -> on eteint
+      digitalWrite(pinLEDRouge, HIGH);
+      digitalWrite(pinLEDBlanche, HIGH);
+      isAllume = false;
+    }
+    else{//trop sombre -> on allume
+      digitalWrite(pinLEDRouge, LOW);
+      digitalWrite(pinLEDBlanche, LOW);
+      isAllume = true;
+    }
   }
-  else{
-    digitalWrite(pinLEDRouge, LOW);
-    digitalWrite(pinLEDBlanche, LOW);
+  else{ //si les feux sont en mode manuels
+    if(feux_allume){//on les allume
+      digitalWrite(pinLEDRouge, LOW);
+      digitalWrite(pinLEDBlanche, LOW);
+    }
+    else{//on les eteints
+      digitalWrite(pinLEDRouge, HIGH);
+      digitalWrite(pinLEDBlanche, HIGH);
+    }
+  }
+  
+  t2 = micros();
+  if(t2-t1 > 300000){
+    Serial.println("coucou");
+    if(isAllume){
+      ESP_BT.println('a');
+    }
+    else{
+      ESP_BT.println('e');
+    }
+    t1 = micros();
   }
 }
 
