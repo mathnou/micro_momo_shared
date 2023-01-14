@@ -26,8 +26,11 @@ boolean isAllume = false;
 boolean feux_auto = true;
 boolean isAvance = false;
 boolean isRecule = false;
+float correctionRoueDroite = 1;
+float correctionRoueGauche = 1;
 String toSendBattery = "";
 String toSendLight = "";
+String toSendLuminosity = "";
 
 
 
@@ -73,7 +76,7 @@ void loop() {
           chaine.toCharArray(floatbuf, sizeof(floatbuf));
           float f = atof(floatbuf);
           pourcentageVitesse= f*100;
-          roue_droite(pourcentageVitesse);
+          roue_droite(pourcentageVitesse*correctionRoueDroite);
       }
       
       else if((char)received=='g'){ //comme gauche
@@ -89,7 +92,7 @@ void loop() {
           chaine.toCharArray(floatbuf, sizeof(floatbuf));
           float f = atof(floatbuf);
           pourcentageVitesse= f*100;
-          roue_gauche(pourcentageVitesse);
+          roue_gauche(pourcentageVitesse*correctionRoueGauche);
       }
 
       else if((char)received=='m'){ //comme manuel, pour l'eclairage
@@ -103,7 +106,26 @@ void loop() {
       }
       else if((char)received=='s'){
           stopCar();
-
+      }
+      else if((char)received=='c'){//comme correction
+        String chaine="";
+          while((char)received!='w'){
+            Serial.println((char)received);
+            chaine += (char)received;
+            received=ESP_BT.read();
+          }
+          chaine = chaine.substring(1,-1);
+          char floatbuf[32]; //make this at least big enough for the whole string
+          chaine.toCharArray(floatbuf, sizeof(floatbuf));
+          float correctionRoue = atof(floatbuf);
+          if(correctionRoue >= 1){
+            correctionRoueDroite = 2 - correctionRoue;
+            correctionRoueGauche = 1;
+          }
+          else{
+            correctionRoueGauche = correctionRoue;
+            correctionRoueDroite = 1;
+          }
       }
       sendParameter();    
     }
@@ -154,28 +176,29 @@ void roue_droite(float pourcentageVitesse){
 }
 
 void checkStateLights(){
+  int value = analogRead(LDR);//plus value est grand, plus il fait sombre
+  toSendLuminosity = "L" + String(value) + "l";
   if(feux_auto){  //si les feux sont en mode automatiques
-    int value = analogRead(LDR);
-    if(value>eclairage_minimal){//suffisament clair -> on eteint
-      digitalWrite(pinLEDRouge, HIGH);
-      digitalWrite(pinLEDBlanche, HIGH);
+    if(value<eclairage_minimal){//suffisament clair -> on eteint
+      digitalWrite(pinLEDRouge, LOW);
+      digitalWrite(pinLEDBlanche, LOW);
       isAllume = false;
     }
     else{//trop sombre -> on allume
-      digitalWrite(pinLEDRouge, LOW);
-      digitalWrite(pinLEDBlanche, LOW);
+      digitalWrite(pinLEDRouge, HIGH);
+      digitalWrite(pinLEDBlanche, HIGH);
       isAllume = true;
     }
   }
   else{ //si les feux sont en mode manuels
     if(feux_allume){//on les allume
-      digitalWrite(pinLEDRouge, LOW);
-      digitalWrite(pinLEDBlanche, LOW);
+      digitalWrite(pinLEDRouge, HIGH);
+      digitalWrite(pinLEDBlanche, HIGH);
       isAllume = true;
     }
     else{//on les eteints
-      digitalWrite(pinLEDRouge, HIGH);
-      digitalWrite(pinLEDBlanche, HIGH);
+      digitalWrite(pinLEDRouge, LOW);
+      digitalWrite(pinLEDBlanche, LOW);
       isAllume = false;
     }
   }
@@ -204,9 +227,7 @@ void BatteryLevel(){ //Le format d'envoi est "B57b" pour un niveau à 57% par ex
   float coeffDir = (float)100/(4.2-1.9);
   float ordonnee = (float)100-coeffDir*4.2;
   float pourcentageLevel = tensionBat*coeffDir + ordonnee ;
-  Serial.println("pourcentage");
-  Serial.println(pourcentageLevel);
-  String toSendBattery = "B" + String(pourcentageLevel);
+  toSendBattery = "B" + String(pourcentageLevel);
   toSendBattery += "b"; //Pour signifier la fin du message
 }
 
@@ -216,8 +237,10 @@ void sendParameter(){//recupere toutes les infos et les met dans un chaine qu'on
   
   t2 = micros();
   if(t2-t1 > 300000){//on envoie toutes les 0.3 secondes
-    ESP_BT.print(toSendBattery + toSendLight);
-    Serial.println("message" + toSendBattery + toSendLight);
+    ESP_BT.print(toSendBattery + toSendLight + toSendLuminosity);
+    Serial.println("message" + toSendBattery + toSendLight + toSendLuminosity);
+    Serial.println("correction droite : "+String(correctionRoueDroite));
+    Serial.println("correction gauche : "+String(correctionRoueGauche));
     t1 = micros();
   }
 }
