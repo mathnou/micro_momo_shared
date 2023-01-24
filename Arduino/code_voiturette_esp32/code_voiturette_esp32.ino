@@ -18,7 +18,7 @@ BluetoothSerial ESP_BT;
 float coeffPont;
 
 float pourcentageVitesse=0;
-int eclairage_minimal = 1000;
+int eclairage_minimal = 2048;
 long int t1 = 0;
 long int t2 = 0;
 boolean feux_allume = false;
@@ -36,7 +36,7 @@ String toSendLuminosity = "";
 
 void setup() {
   Serial.begin(19200);
-  ESP_BT.begin("PCB_MicroMomo");  
+  ESP_BT.begin("PCB_MicroMomo2");  
   
   // Initialize les broches de commandes 
   // du moteur A
@@ -64,10 +64,8 @@ void loop() {
       received = ESP_BT.read();        
 
       if((char)received=='d'){   //d comme droite
-          Serial.println("roue droite");
           String chaine="";
           while((char)received!='w'){
-            Serial.println((char)received);
             chaine += (char)received;
             received=ESP_BT.read();
           }
@@ -79,11 +77,9 @@ void loop() {
           roue_droite(pourcentageVitesse*correctionRoueDroite);
       }
       
-      else if((char)received=='g'){ //comme gauche
-          Serial.println("roue gauche");
+      else if((char)received=='g'){ //g comme gauche
           String chaine="";
           while((char)received!='w'){
-            Serial.println((char)received);
             chaine += (char)received;
             received=ESP_BT.read();
           }
@@ -104,7 +100,24 @@ void loop() {
       else if((char)received=='f'){ //comme feux, pour allumer/eteindre l'eclairage
         feux_allume = 1-feux_allume;             
       }
-      else if((char)received=='s'){
+      else if((char)received=='t'){//comme Tiger, dans eye of the tiger YEEEE man !
+        danse();
+        Serial.println("danse");
+      }
+      else if((char)received=='l'){//comme light level
+        String chaine="";
+          while((char)received!='w'){
+            Serial.println((char)received);
+            chaine += (char)received;
+            received=ESP_BT.read();
+          }
+          chaine = chaine.substring(1,-1);
+          char floatbuf[32]; //make this at least big enough for the whole string
+          chaine.toCharArray(floatbuf, sizeof(floatbuf));
+          float lum = atof(floatbuf);
+          eclairage_minimal = (int)(lum/100*4096);
+      }
+      else if((char)received=='s'){//comme stop
           stopCar();
       }
       else if((char)received=='c'){//comme correction
@@ -177,7 +190,9 @@ void roue_droite(float pourcentageVitesse){
 
 void checkStateLights(){
   int value = analogRead(LDR);//plus value est grand, plus il fait sombre
-  toSendLuminosity = "L" + String(value) + "l";
+  
+  float luminosity = 100 - (100*(float)value)/4096;
+  toSendLuminosity = "L" + String((int)luminosity) + "l";
   if(feux_auto){  //si les feux sont en mode automatiques
     if(value<eclairage_minimal){//suffisament clair -> on eteint
       digitalWrite(pinLEDRouge, LOW);
@@ -238,9 +253,123 @@ void sendParameter(){//recupere toutes les infos et les met dans un chaine qu'on
   t2 = micros();
   if(t2-t1 > 300000){//on envoie toutes les 0.3 secondes
     ESP_BT.print(toSendBattery + toSendLight + toSendLuminosity);
-    Serial.println("message" + toSendBattery + toSendLight + toSendLuminosity);
-    Serial.println("correction droite : "+String(correctionRoueDroite));
-    Serial.println("correction gauche : "+String(correctionRoueGauche));
+    Serial.println("message : " + toSendBattery + toSendLight + toSendLuminosity);
     t1 = micros();
   }
+}
+
+///////////////////////////////////////tout ca pour faire danser la micro momo///////////////////////////////////////////////////////////////////////////
+void danse(){
+  delay(10380);
+  Serial.println("Choree demarre");
+  avancer(100.0);
+  delay(800);
+  stopCar();
+  delay(200);
+
+  reculer(100.0);
+  delay(400);
+  //Serial.println("Avance");
+  avancer(100.0);
+  delay(400);
+  reculer(100.0);
+  delay(400);
+  stopCar();
+
+  delay(1000);
+
+  avancer(100.0);
+  delay(400);
+  //Serial.println("Avance");
+  reculer(100.0);
+  delay(400);
+  avancer(100.0);
+  delay(400);
+  //Serial.println("Stop");
+  stopCar();
+
+  delay(1000);
+
+  reculer(100.0);
+  delay(400);
+  //Serial.println("Avance");
+  avancer(100.0);
+  delay(400);
+  reculer(100.0);
+  delay(400);
+
+  tourADroite(100.0, 1500);
+  stopCar();
+
+  delay(800);
+
+  avancer(100.0);
+  delay(800);
+  stopCar();
+  delay(200);
+
+  reculer(100.0);
+  delay(400);
+  //Serial.println("Avance");
+  avancer(100.0);
+  delay(400);
+  reculer(100.0);
+  delay(400);
+  stopCar();
+
+  delay(1000);
+
+  avancer(100.0);
+  delay(400);
+  //Serial.println("Avance");
+  reculer(100.0);
+  delay(400);
+  avancer(100.0);
+  delay(400);
+  //Serial.println("Stop");
+  stopCar();
+
+  delay(1000);
+
+  reculer(100.0);
+  delay(400);
+  //Serial.println("Avance");
+  avancer(100.0);
+  delay(400);
+  tourADroite(100.0, 1500);
+  delay(400);
+  stopCar();
+}
+
+
+void avancer(float pourcentageVitesse){
+  analogWrite( pinINA2, LOW );
+  analogWrite(pinINB2, LOW);
+  Serial.println(pourcentageVitesse);
+  int duty = int(pourcentageVitesse*2.55);
+  analogWrite( pinINA1, duty );
+  analogWrite(pinINB1, duty);
+  isAvance=true;
+  isRecule=false;
+}
+
+void reculer(float pourcentageVitesse){
+  analogWrite( pinINA1, LOW );
+  analogWrite(pinINB1, LOW);
+  Serial.println(pourcentageVitesse);
+  int duty = int(pourcentageVitesse*2.55);
+  analogWrite( pinINA2, duty );
+  analogWrite(pinINB2, duty);
+  isAvance=false;
+  isRecule=true;
+}
+
+void tourADroite(float pourcentageVitesse, int delayValue){
+  int duty = int(pourcentageVitesse*2.55);
+  Serial.println("Tourner à droite");
+  analogWrite( pinINA2, LOW);
+  analogWrite( pinINB1, LOW);
+  analogWrite( pinINA1, duty );
+  analogWrite(pinINB2, duty);
+  delay(delayValue);
 }
