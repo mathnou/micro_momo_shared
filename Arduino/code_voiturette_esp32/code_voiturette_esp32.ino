@@ -1,6 +1,7 @@
 #include "BluetoothSerial.h" 
 BluetoothSerial ESP_BT;  
 #include <analogWrite.h>
+#include <Arduino.h>
 
 
 #define pinINA1 14 // Moteur A, entrée 1 - Commande en PWM possible
@@ -32,11 +33,18 @@ String toSendBattery = "";
 String toSendLight = "";
 String toSendLuminosity = "";
 
+#define DISABLE_CODE_FOR_RECEIVER // Saves 450 bytes program memory and 269 bytes RAM if receiving functions are not used.
+#include "PinDefinitionsAndMore.h" // Define macros for input and output pin etc.
+#include <IRremote.hpp>
+int led2Pin = 2;
 
+uint8_t sRepeats = 0;
+uint8_t address[6]  = {0x94, 0xB9, 0x7E, 0xD9, 0xBA, 0x7A}; //L'adresse de l'ESP de la base
+bool connected;
 
 void setup() {
   Serial.begin(19200);
-  ESP_BT.begin("PCB_MicroMomo2");  
+  ESP_BT.begin("57-JACQUELINE-FR");  
   
   // Initialize les broches de commandes 
   // du moteur A
@@ -50,6 +58,17 @@ void setup() {
 
   pinMode(pinBatteryLevel, INPUT);
   coeffPont = (float)12/(12+3); //Valeurs de resistances utilisées (12kOhms et 3kOhms)
+  
+  pinMode(led2Pin, OUTPUT);
+
+  Serial.println(F("START " __FILE__ " from " __DATE__ "\r\nUsing library version " VERSION_IRREMOTE));
+  /*
+   * The IR library setup. That's all!
+   */
+  IrSender.begin(); // Start with IR_SEND_PIN as send pin and if NO_LED_FEEDBACK_CODE is NOT defined, enable feedback LED at default feedback LED pin
+  //IrSender.begin(DISABLE_LED_FEEDBACK); // Start with IR_SEND_PIN as send pin and disable feedback LED at default feedback LED pin
+  Serial.print(F("Send IR signals at pin "));
+  Serial.println(IR_SEND_PIN);
 }
 
 void loop() {
@@ -103,6 +122,9 @@ void loop() {
       else if((char)received=='t'){//comme Tiger, dans eye of the tiger YEEEE man !
         danse();
         Serial.println("danse");
+      }
+      else if((char)received=='r'){ //comme retour, pour le comeBack Home
+        comeBack();              
       }
       else if((char)received=='l'){//comme light level
         String chaine="";
@@ -336,6 +358,7 @@ void danse(){
   //Serial.println("Avance");
   avancer(100.0);
   delay(400);
+  stopCar();
   tourADroite(100.0, 1500);
   delay(400);
   stopCar();
@@ -343,12 +366,8 @@ void danse(){
 
 
 void avancer(float pourcentageVitesse){
-  analogWrite( pinINA2, LOW );
-  analogWrite(pinINB2, LOW);
-  Serial.println(pourcentageVitesse);
-  int duty = int(pourcentageVitesse*2.55);
-  analogWrite( pinINA1, duty );
-  analogWrite(pinINB1, duty);
+  roue_gauche(pourcentageVitesse);
+  roue_droite(pourcentageVitesse);
   isAvance=true;
   isRecule=false;
 }
@@ -365,11 +384,72 @@ void reculer(float pourcentageVitesse){
 }
 
 void tourADroite(float pourcentageVitesse, int delayValue){
-  int duty = int(pourcentageVitesse*2.55);
-  Serial.println("Tourner à droite");
-  analogWrite( pinINA2, LOW);
-  analogWrite( pinINB1, LOW);
-  analogWrite( pinINA1, duty );
-  analogWrite(pinINB2, duty);
+  roue_gauche(pourcentageVitesse);
   delay(delayValue);
+}
+
+void tourAGauche(float pourcentageVitesse, int delayValue){
+  roue_droite(pourcentageVitesse);
+  delay(delayValue);
+}
+
+void comeBack(){
+  Serial.println("dans le come back");
+  ESP_BT.disconnect();
+  ESP_BT.end();
+  ESP_BT.begin("Test infra", true);  
+
+  connected = ESP_BT.connect(address);
+
+  if(connected) {
+    Serial.println("Connected Succesfully!");
+  } else {
+    while(!ESP_BT.connected(10000)) {
+      Serial.println("Failed to connect. Make sure remote device is available and in range, then restart app."); 
+    }
+  }
+  
+  if(connected) {
+    Serial.println("Connected Succesfully!");
+    bool hasToTurnLeft=0;
+    
+    while(ESP_BT.hasClient()){
+      IrSender.sendNEC(0x5583, 0x85, sRepeats);
+      delay(200); //delay(200);
+      int received;
+      received = ESP_BT.read();
+      //Serial.println("Yo man");        
+  
+      if((char)received=='d'){   //d comme detecte
+          Serial.println("Signal reçu");
+          //avancer(100);
+          roue_gauche(100);
+          roue_droite(100);
+          delay(300);
+          stopCar();
+          //tourAGauche(100, 50);
+          //stopCar();
+          hasToTurnLeft=1;
+      }
+      else{
+        if(hasToTurnLeft==1){
+          tourAGauche(100,110);
+          stopCar();
+        }
+        Serial.println("Signal perdu");
+        tourADroite(100,10);
+        stopCar();
+        hasToTurnLeft=0;
+        //delay(200);
+      }
+      //delay(100);
+    }
+
+    ESP_BT.disconnect();
+    ESP_BT.end();
+    ESP_BT.begin("57-JACQUELINE-FR");  
+    stopCar();
+    
+  } 
+  
 }
